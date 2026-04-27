@@ -1,0 +1,6 @@
+Test da eseguire:
+
+1 - Test connesione
+2 - Testare injection query
+3 - Test Inserimento
+4 - Test get
