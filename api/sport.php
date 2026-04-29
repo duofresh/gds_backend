@@ -42,7 +42,7 @@ try {
 
     // 4. Connessione al DB (Utilizzo MySQLi)
     $db_host = 'localhost';
-    $db_name = 'giornatadellosport';
+    $db_name = 'giornosportcompleto';
     $db_user = 'admin_user'; 
     $db_pass = 'admin';    
 
