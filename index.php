@@ -13,8 +13,8 @@ switch ($request) {
     case "/":
         echo "OK";
         break;
-    case "/giocatori":
-        require __DIR__ . "/api/giocatori.php";
+    case "/api/giocatori":
+        include "/api/giocatori.php";
         break;
     default:
         http_response_code(404);
