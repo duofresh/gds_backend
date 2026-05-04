@@ -1,6 +1,6 @@
 <?php
 // routing dinamico
-$request = $_SERVER["REQUEST_URI"];
+$request = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
  
 $base_path = "/gds_backend/";
 if (strpos($request, $base_path) === 0) {
@@ -13,8 +13,8 @@ switch ($request) {
     case "/":
         echo "OK";
         break;
-    case "/giocatori":
-        require __DIR__ . "/api/giocatori.php";
+    case "/api/giocatori":
+        include "api/giocatori.php";
         break;
     default:
         http_response_code(404);

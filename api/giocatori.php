@@ -11,8 +11,8 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 $host   = "127.0.0.1";
 $dbname = "gds"; 
-$user   = "admin_user";           
-$pass   = "admin";               
+$user   = "root";           
+$pass   = "";               
 
 try {
     $pdo = new PDO(
@@ -81,6 +81,11 @@ try {
             ");
             $stmt->execute([":id_squadra" => (int) $queryParams["id_squadra"]]);
             $giocatori = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!$giocatori) {
+                throw new Exception("Squadra non trovata", 404);
+            }
+
 
             $response["status"]  = "success";
             $response["message"] = "Giocatori della squadra recuperati con successo";
