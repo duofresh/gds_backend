@@ -13,8 +13,8 @@ switch ($request) {
     case "/":
         echo "OK";
         break;
-    case "/api/":
-        include "api/endpoint_template.php";
+    case "/squadre":
+        include "api/squadre.php";
         break;
     default:
         http_response_code(404);
