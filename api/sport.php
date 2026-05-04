@@ -41,16 +41,7 @@ try {
     // --- INIZIO LOGICA INTEGRATA CON REQUISITI ---
 
     // 4. Connessione al DB (Utilizzo MySQLi)
-    $db_host = '127.0.0.1';
-    $db_name = 'gds';
-    $db_user = 'root'; 
-    $db_pass = '';    
-
-    // Creazione dell'istanza MySQLi
-    $mysqli = new mysqli($db_host, $db_user, $db_pass, $db_name);
-    
-    // Imposta il charset per evitare problemi con caratteri speciali
-    $mysqli->set_charset("utf8mb4");
+    $mysqli = require_once __DIR__ . '/../utils/conn.php';
 
     // 5. Nessuna gestione input tramite ID richiesta per estrarre tutti gli sport
 
