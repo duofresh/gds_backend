@@ -37,7 +37,7 @@ try {
     $input = json_decode(file_get_contents("php://input"), true);
     // per parametri query:
     $queryParams = $_GET;
-
+    $mysqli = require_once __DIR__ . '/../utils/conn.php';
     // --- LOGICA BASE VA QUI ---
 
     // Esempio; richiedi dati o formatta richiesta
