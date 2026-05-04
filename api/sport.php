@@ -41,48 +41,24 @@ try {
     // --- INIZIO LOGICA INTEGRATA CON REQUISITI ---
 
     // 4. Connessione al DB (Utilizzo MySQLi)
-    $db_host = '127.0.0.1';
-    $db_name = 'gds';
-    $db_user = 'root'; 
-    $db_pass = '';    
+    $mysqli = require_once __DIR__ . '/../utils/conn.php';
 
-    // Creazione dell'istanza MySQLi
-    $mysqli = new mysqli($db_host, $db_user, $db_pass, $db_name);
-    
-    // Imposta il charset per evitare problemi con caratteri speciali
-    $mysqli->set_charset("utf8mb4");
+    // 5. Nessuna gestione input tramite ID richiesta per estrarre tutti gli sport
 
-    // 5. Gestione input tramite $_GET e controllo minimo (es. intval)
-    if (!isset($_GET['id'])) {
-        throw new Exception("Parametro 'id' mancante nella richiesta", 400); // 400 Bad Request
-    }
-
-    // Assicuriamoci che l'ID sia un numero intero valido
-    $id = intval($_GET['id']);
-    
-    if ($id <= 0) {
-        throw new Exception("L'id fornito non è in un formato valido", 400);
-    }
-
-    // 6. Esecuzione query corretta e sicura (Prepared Statement in MySQLi)
-    // Nota: MySQLi usa "?" come segnaposto al posto di parametri nominati come ":id"
-    $query = "SELECT * FROM sport WHERE id_sport = ? LIMIT 1";
-    $stmt = $mysqli->prepare($query);
-    
-    // Associa il parametro all'ID. "i" sta per integer.
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
+    // 6. Esecuzione query per estrarre tutti i record
+    $query = "SELECT * FROM sport";
+    $result_set = $mysqli->query($query);
 
     // 7. Costruzione dell'array dei risultati
-    $result_set = $stmt->get_result();
-    $result = $result_set->fetch_all(MYSQLI_ASSOC);
-    
-    // Chiusura dello statement per liberare risorse
-    $stmt->close();
+    if ($result_set) {
+        $result = $result_set->fetch_all(MYSQLI_ASSOC);
+    } else {
+        throw new Exception("Errore nell'esecuzione della query", 500);
+    }
 
     // Verifichiamo se l'array è vuoto (nessun record trovato)
     if (!$result) {
-        throw new Exception("Nessun record trovato per l'ID specificato", 404); // 404 Not Found
+        throw new Exception("Nessun sport trovato", 404); // 404 Not Found
     }
 
     // 8. Costruzione risposta nel caso di successo
