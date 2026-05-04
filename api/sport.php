@@ -43,17 +43,32 @@ try {
     // 4. Connessione al DB (Utilizzo MySQLi)
     $mysqli = require_once __DIR__ . '/../utils/conn.php';
 
-    // 5. Nessuna gestione input tramite ID richiesta per estrarre tutti gli sport
+    // 5. Gestione input tramite $_GET e query dinamica
+    if (isset($_GET['id'])) {
+        // Estrazione di un singolo sport tramite ID
+        $id = intval($_GET['id']);
+        if ($id <= 0) {
+            throw new Exception("L'id fornito non è in un formato valido", 400);
+        }
 
-    // 6. Esecuzione query per estrarre tutti i record
-    $query = "SELECT * FROM sport";
-    $result_set = $mysqli->query($query);
-
-    // 7. Costruzione dell'array dei risultati
-    if ($result_set) {
+        $query = "SELECT * FROM sport WHERE id_sport = ? LIMIT 1";
+        $stmt = $mysqli->prepare($query);
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        
+        $result_set = $stmt->get_result();
         $result = $result_set->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
     } else {
-        throw new Exception("Errore nell'esecuzione della query", 500);
+        // Estrazione di tutti gli sport
+        $query = "SELECT * FROM sport";
+        $result_set = $mysqli->query($query);
+
+        if ($result_set) {
+            $result = $result_set->fetch_all(MYSQLI_ASSOC);
+        } else {
+            throw new Exception("Errore nell'esecuzione della query", 500);
+        }
     }
 
     // Verifichiamo se l'array è vuoto (nessun record trovato)
