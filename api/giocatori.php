@@ -248,7 +248,7 @@ try {
         }
 
         $nome       = $input["nome"]       ?? null;
-        $cognome    = $input["cognome"]     ?? null;
+        $cognome    = $input["cognome"]    ?? null;
         $eta        = isset($input["eta"])        ? (int) $input["eta"]        : null;
         $agonista   = isset($input["agonista"])   ? (int) $input["agonista"]   : null;
         $id_squadra = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
