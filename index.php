@@ -14,6 +14,9 @@ switch ($request) {
     case "/":
         echo "OK";
         break;
+    case "/api/squadre":
+        include "api/squadre.php";
+        break;
     case "/api/giocatori":
         include "api/giocatori.php";
         break;
