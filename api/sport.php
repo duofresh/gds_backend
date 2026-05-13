@@ -33,9 +33,9 @@ try {
     // 3. Validazione metodo richiesta
     $method = $_SERVER["REQUEST_METHOD"];
 
-    // In questo esempio accettiamo solo richieste GET
-    if ($method !== 'GET') {
-        throw new Exception("Method not allowed. Use GET.", 405);
+    // Accettiamo richieste GET e POST
+    if ($method !== 'GET' && $method !== 'POST') {
+        throw new Exception("Method not allowed. Use GET or POST.", 405);
     }
 
     // --- INIZIO LOGICA INTEGRATA CON REQUISITI ---
@@ -43,45 +43,77 @@ try {
     // 4. Connessione al DB (Utilizzo MySQLi)
     $mysqli = require_once __DIR__ . '/../utils/conn.php';
 
-    // 5. Gestione input tramite $_GET e query dinamica
-    if (isset($_GET['id'])) {
-        // Estrazione di un singolo sport tramite ID
-        $id = intval($_GET['id']);
-        if ($id <= 0) {
-            throw new Exception("L'id fornito non è in un formato valido", 400);
-        }
+    if ($method === 'GET') {
+        // 5. Gestione input tramite $_GET e query dinamica
+        if (isset($_GET['id'])) {
+            // Estrazione di un singolo sport tramite ID
+            $id = intval($_GET['id']);
+            if ($id <= 0) {
+                throw new Exception("L'id fornito non è in un formato valido", 400);
+            }
 
-        $query = "SELECT * FROM sport WHERE id_sport = ? LIMIT 1";
-        $stmt = $mysqli->prepare($query);
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        
-        $result_set = $stmt->get_result();
-        $result = $result_set->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-    } else {
-        // Estrazione di tutti gli sport
-        $query = "SELECT * FROM sport";
-        $result_set = $mysqli->query($query);
-
-        if ($result_set) {
+            $query = "SELECT * FROM sport WHERE id_sport = ? LIMIT 1";
+            $stmt = $mysqli->prepare($query);
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            
+            $result_set = $stmt->get_result();
             $result = $result_set->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
         } else {
-            throw new Exception("Errore nell'esecuzione della query", 500);
+            // Estrazione di tutti gli sport
+            $query = "SELECT * FROM sport";
+            $result_set = $mysqli->query($query);
+            $result = $result_set->fetch_all(MYSQLI_ASSOC);
         }
-    }
 
-    // Verifichiamo se l'array è vuoto (nessun record trovato)
-    if (!$result) {
-        throw new Exception("Nessun sport trovato", 404); // 404 Not Found
-    }
+        // Verifichiamo se l'array è vuoto (nessun record trovato)
+        if (!$result) {
+            throw new Exception("Nessun sport trovato", 404); // 404 Not Found
+        }
 
-    // 8. Costruzione risposta nel caso di successo
-    $response["status"] = "success";
-    $response["message"] = "Endpoint raggiunto e dati estratti con successo";
-    $response["data"] = $result; // L'array contenente i dati del DB
-    
-    http_response_code(200); // 200 OK
+        // Costruzione risposta per GET
+        $response["status"] = "success";
+        $response["message"] = "Dati estratti con successo";
+        $response["data"] = $result;
+        http_response_code(200); // 200 OK
+
+    } elseif ($method === 'POST') {
+        // Inserimento di un nuovo sport
+        $inputData = json_decode(file_get_contents("php://input"), true);
+        if (!$inputData || !isset($inputData['nome'])) {
+            throw new Exception("Dati mancanti o formato JSON non valido. Richiesto campo 'nome'.", 400);
+        }
+
+        $nome = trim($inputData['nome']);
+        $descrizione = isset($inputData['descrizione']) ? trim($inputData['descrizione']) : null;
+
+        if (empty($nome)) {
+             throw new Exception("Il campo 'nome' non può essere vuoto", 400);
+        }
+
+        $query = "INSERT INTO sport (nome, descrizione) VALUES (?, ?)";
+        $stmt = $mysqli->prepare($query);
+        $stmt->bind_param("ss", $nome, $descrizione);
+        
+        if ($stmt->execute()) {
+            $newId = $stmt->insert_id;
+            $result = [
+                "id_sport" => $newId,
+                "nome" => $nome,
+                "descrizione" => $descrizione
+            ];
+            
+            // Costruzione risposta per POST
+            $response["status"] = "success";
+            $response["message"] = "Sport creato con successo";
+            $response["data"] = $result;
+            http_response_code(201); // 201 Created
+        } else {
+            throw new Exception("Errore durante l'inserimento dello sport", 500);
+        }
+        $stmt->close();
+    }
 
     // --- FINE LOGICA ---
 
