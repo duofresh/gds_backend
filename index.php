@@ -13,7 +13,7 @@ switch ($request) {
     case "/":
         echo "OK";
         break;
-    case "/squadre":
+    case "/api/squadre":
         include "api/squadre.php";
         break;
     default:
