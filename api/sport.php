@@ -64,12 +64,7 @@ try {
             // Estrazione di tutti gli sport
             $query = "SELECT * FROM sport";
             $result_set = $mysqli->query($query);
-
-            if ($result_set) {
-                $result = $result_set->fetch_all(MYSQLI_ASSOC);
-            } else {
-                throw new Exception("Errore nell'esecuzione della query", 500);
-            }
+            $result = $result_set->fetch_all(MYSQLI_ASSOC);
         }
 
         // Verifichiamo se l'array è vuoto (nessun record trovato)
