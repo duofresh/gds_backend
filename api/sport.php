@@ -9,7 +9,7 @@
 // 1. Header (Intestazione) - per comunicare in JSON
 header("Access-Control-Allow-Origin: *"); // Policy CORS
 header("Content-Type: application/json; charset=UTF-8"); // Tipo JSON
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS"); // Metodi HTTP permessi
+header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS"); // Metodi HTTP permessi
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
@@ -33,9 +33,9 @@ try {
     // 3. Validazione metodo richiesta
     $method = $_SERVER["REQUEST_METHOD"];
 
-    // Accettiamo richieste GET e POST
-    if ($method !== 'GET' && $method !== 'POST') {
-        throw new Exception("Method not allowed. Use GET or POST.", 405);
+    // Accettiamo richieste GET, POST e DELETE
+    if ($method !== 'GET' && $method !== 'POST' && $method !== 'DELETE') {
+        throw new Exception("Method not allowed. Use GET, POST or DELETE.", 405);
     }
 
     // --- INIZIO LOGICA INTEGRATA CON REQUISITI ---
@@ -116,6 +116,44 @@ try {
             http_response_code(201); // 201 Created
         } else {
             throw new Exception("Errore durante l'inserimento dello sport", 500);
+        }
+        $stmt->close();
+    } elseif ($method === 'DELETE') {
+        // Eliminazione di uno sport
+        if (!isset($_GET['id'])) {
+            // Prova a leggere dal body JSON in caso l'ID non sia in query string
+            $inputData = json_decode(file_get_contents("php://input"), true);
+            if (isset($inputData['id_sport'])) {
+                $id = intval($inputData['id_sport']);
+            } elseif (isset($inputData['id'])) {
+                $id = intval($inputData['id']);
+            } else {
+                throw new Exception("ID mancante per l'eliminazione. Fornire l'id nella query string o nel body JSON.", 400);
+            }
+        } else {
+            $id = intval($_GET['id']);
+        }
+
+        if ($id <= 0) {
+            throw new Exception("L'id fornito non è in un formato valido", 400);
+        }
+
+        $query = "DELETE FROM sport WHERE id_sport = ?";
+        $stmt = $mysqli->prepare($query);
+        $stmt->bind_param("i", $id);
+        
+        if ($stmt->execute()) {
+            if ($stmt->affected_rows > 0) {
+                // Costruzione risposta per DELETE
+                $response["status"] = "success";
+                $response["message"] = "Sport eliminato con successo";
+                $response["data"] = null;
+                http_response_code(200); // 200 OK
+            } else {
+                throw new Exception("Nessun sport trovato con l'id fornito", 404);
+            }
+        } else {
+            throw new Exception("Errore durante l'eliminazione dello sport", 500);
         }
         $stmt->close();
     }
