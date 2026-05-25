@@ -124,20 +124,63 @@ try {
             throw new Exception("Body JSON mancante o non valido", 400);
         }
 
-        if (empty($input["id_torneo"]) || empty($input["id_match"]) || empty($input["turno"]) || empty($input["id_squadra1"])) {
+        if (!isset($input["id_torneo"], $input["id_match"], $input["turno"], $input["id_squadra1"])) {
             throw new Exception("Campi obbligatori mancanti: id_torneo, id_match, turno, id_squadra1", 400);
         }
 
-        $id_torneo   = (int) $input["id_torneo"];
-        $id_match    = (int) $input["id_match"];
-        $turno       = (int) $input["turno"];
-        $id_squadra1 = (int) $input["id_squadra1"];
-        $id_squadra2 = isset($input["id_squadra2"]) ? (int) $input["id_squadra2"] : null;
+        $id_torneo = filter_var(
+            $input["id_torneo"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+        $id_match = filter_var(
+            $input["id_match"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+        $turno = filter_var(
+            $input["turno"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+        $id_squadra1 = filter_var(
+            $input["id_squadra1"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+
+        if ($id_torneo === false || $id_match === false || $turno === false || $id_squadra1 === false) {
+            throw new Exception("id_torneo, id_match, turno e id_squadra1 devono essere interi maggiori di 0", 400);
+        }
+
+        $id_squadra2 = null;
+        if (array_key_exists("id_squadra2", $input) && $input["id_squadra2"] !== null) {
+            $id_squadra2 = filter_var(
+                $input["id_squadra2"],
+                FILTER_VALIDATE_INT,
+                ["options" => ["min_range" => 1]]
+            );
+            if ($id_squadra2 === false) {
+                throw new Exception("id_squadra2 deve essere un intero maggiore di 0", 400);
+            }
+        }
+
         $data_match  = $input["data_match"] ?? null;
         $stato_match = $input["stato_match"] ?? 'PROGRAMMATO';
         $punteggio1  = isset($input["punteggio1"]) ? (int) $input["punteggio1"] : 0;
         $punteggio2  = isset($input["punteggio2"]) ? (int) $input["punteggio2"] : 0;
-        $id_vincitore= isset($input["id_vincitore"]) ? (int) $input["id_vincitore"] : null;
+
+        $id_vincitore = null;
+        if (array_key_exists("id_vincitore", $input) && $input["id_vincitore"] !== null) {
+            $id_vincitore = filter_var(
+                $input["id_vincitore"],
+                FILTER_VALIDATE_INT,
+                ["options" => ["min_range" => 1]]
+            );
+            if ($id_vincitore === false) {
+                throw new Exception("id_vincitore deve essere un intero maggiore di 0", 400);
+            }
+        }
 
         $stmt = $mysqli->prepare("
             INSERT INTO match_torneo (id_torneo, id_match, turno, id_squadra1, id_squadra2, data_match, stato_match, punteggio1, punteggio2, id_vincitore)
