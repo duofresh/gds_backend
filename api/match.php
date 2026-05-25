@@ -204,13 +204,27 @@ try {
             throw new Exception("Body JSON mancante", 400);
         }
 
-        if (!isset($input["id_torneo"]) || !isset($input["id_match"]) || !isset($input["turno"])) {
+        if (!isset($input["id_torneo"], $input["id_match"], $input["turno"])) {
             throw new Exception("Chiavi primarie mancanti per aggiornare un match: id_torneo, id_match, turno", 400);
         }
 
-        $id_torneo = (int) $input["id_torneo"];
-        $id_match  = (int) $input["id_match"];
-        $turno     = (int) $input["turno"];
+        $id_torneo = filter_var($input["id_torneo"], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
+        $id_match  = filter_var($input["id_match"], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
+        $turno     = filter_var($input["turno"], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
+
+        if ($id_torneo === false || $id_match === false || $turno === false) {
+            throw new Exception("id_torneo, id_match e turno devono essere interi positivi", 400);
+        }
+
+        // Verifica esistenza match prima dell'aggiornamento
+        $check = $mysqli->prepare("SELECT 1 FROM match_torneo WHERE id_torneo = ? AND id_match = ? AND turno = ?");
+        $check->bind_param("iii", $id_torneo, $id_match, $turno);
+        $check->execute();
+        if (!$check->get_result()->fetch_assoc()) {
+            $check->close();
+            throw new Exception("Match non trovato", 404);
+        }
+        $check->close();
 
         $punteggio1    = isset($input["punteggio1"]) ? (int) $input["punteggio1"] : null;
         $punteggio2    = isset($input["punteggio2"]) ? (int) $input["punteggio2"] : null;
