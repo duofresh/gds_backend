@@ -23,6 +23,9 @@ switch ($request) {
     case "/api/sport":
         include "api/sport.php";
         break;
+    case "/api/tornei":
+        include "api/tornei.php";
+        break;
     default:
         http_response_code(404);
         echo "404 - Not Found: " . htmlspecialchars($request);
