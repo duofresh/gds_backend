@@ -1,0 +1,227 @@
+<?php
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Max-Age: 3600");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    http_response_code(200);
+    exit();
+}
+
+$response = [
+    "status"  => "error",
+    "message" => "Internal Server Error",
+    "data"    => null,
+];
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+try {
+
+    $method      = $_SERVER["REQUEST_METHOD"];
+    $input       = json_decode(file_get_contents("php://input"), true);
+    $queryParams = $_GET;
+
+    // Controllo autenticazione per i metodi di scrittura
+    if (in_array($method, ["POST", "PUT", "DELETE"])) {
+        $authHeader = $_SERVER["HTTP_AUTHORIZATION"] ?? "";
+        $apiToken   = getenv("API_WRITE_TOKEN") ?: "";
+        if (
+            !empty($apiToken) && (
+            !preg_match('/^Bearer\s+(.+)$/', $authHeader, $matches) ||
+            !hash_equals($apiToken, $matches[1]))
+        ) {
+            throw new Exception("Accesso non autorizzato", 401);
+        }
+    }
+
+    $mysqli = require_once __DIR__ . '/../utils/conn.php';
+
+    if ($method === "GET") {
+        if (!empty($queryParams["id_torneo"])) {
+            $id_torneo = (int) $queryParams["id_torneo"];
+
+            if (isset($queryParams["id_match"]) && isset($queryParams["turno"])) {
+                // Singolo match
+                $id_match = (int) $queryParams["id_match"];
+                $turno = (int) $queryParams["turno"];
+
+                $stmt = $mysqli->prepare("
+                    SELECT m.*, s1.nome AS nome_squadra1, s2.nome AS nome_squadra2, sv.nome AS nome_vincitore
+                    FROM match_torneo m
+                    LEFT JOIN squadre s1 ON m.id_squadra1 = s1.id_squadra
+                    LEFT JOIN squadre s2 ON m.id_squadra2 = s2.id_squadra
+                    LEFT JOIN squadre sv ON m.id_vincitore = sv.id_squadra
+                    WHERE m.id_torneo = ? AND m.id_match = ? AND m.turno = ?
+                ");
+                $stmt->bind_param("iii", $id_torneo, $id_match, $turno);
+                $stmt->execute();
+                $match = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if (!$match) {
+                    throw new Exception("Match non trovato", 404);
+                }
+
+                $response["status"]  = "success";
+                $response["message"] = "Match recuperato con successo";
+                $response["data"]    = $match;
+
+            } else {
+                // Tutti i match di un torneo
+                $stmt = $mysqli->prepare("
+                    SELECT m.*, s1.nome AS nome_squadra1, s2.nome AS nome_squadra2, sv.nome AS nome_vincitore
+                    FROM match_torneo m
+                    LEFT JOIN squadre s1 ON m.id_squadra1 = s1.id_squadra
+                    LEFT JOIN squadre s2 ON m.id_squadra2 = s2.id_squadra
+                    LEFT JOIN squadre sv ON m.id_vincitore = sv.id_squadra
+                    WHERE m.id_torneo = ?
+                    ORDER BY m.turno, m.id_match
+                ");
+                $stmt->bind_param("i", $id_torneo);
+                $stmt->execute();
+                $matches = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                $stmt->close();
+
+                $response["status"]  = "success";
+                $response["message"] = "Lista match del torneo recuperata con successo";
+                $response["data"]    = $matches;
+            }
+        } else {
+            // Tutti i match in generale
+            $result = $mysqli->query("
+                SELECT m.*, s1.nome AS nome_squadra1, s2.nome AS nome_squadra2, sv.nome AS nome_vincitore
+                FROM match_torneo m
+                LEFT JOIN squadre s1 ON m.id_squadra1 = s1.id_squadra
+                LEFT JOIN squadre s2 ON m.id_squadra2 = s2.id_squadra
+                LEFT JOIN squadre sv ON m.id_vincitore = sv.id_squadra
+                ORDER BY m.id_torneo, m.turno, m.id_match
+            ");
+            $matches = $result->fetch_all(MYSQLI_ASSOC);
+
+            $response["status"]  = "success";
+            $response["message"] = "Lista di tutti i match recuperata con successo";
+            $response["data"]    = $matches;
+        }
+
+        http_response_code(200);
+
+    } elseif ($method === "POST") {
+        if (empty($input)) {
+            throw new Exception("Body JSON mancante o non valido", 400);
+        }
+
+        if (empty($input["id_torneo"]) || empty($input["id_match"]) || empty($input["turno"]) || empty($input["id_squadra1"])) {
+            throw new Exception("Campi obbligatori mancanti: id_torneo, id_match, turno, id_squadra1", 400);
+        }
+
+        $id_torneo   = (int) $input["id_torneo"];
+        $id_match    = (int) $input["id_match"];
+        $turno       = (int) $input["turno"];
+        $id_squadra1 = (int) $input["id_squadra1"];
+        $id_squadra2 = isset($input["id_squadra2"]) ? (int) $input["id_squadra2"] : null;
+        $data_match  = $input["data_match"] ?? null;
+        $stato_match = $input["stato_match"] ?? 'PROGRAMMATO';
+        $punteggio1  = isset($input["punteggio1"]) ? (int) $input["punteggio1"] : 0;
+        $punteggio2  = isset($input["punteggio2"]) ? (int) $input["punteggio2"] : 0;
+        $id_vincitore= isset($input["id_vincitore"]) ? (int) $input["id_vincitore"] : null;
+
+        $stmt = $mysqli->prepare("
+            INSERT INTO match_torneo (id_torneo, id_match, turno, id_squadra1, id_squadra2, data_match, stato_match, punteggio1, punteggio2, id_vincitore)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->bind_param("iiiiissiii", $id_torneo, $id_match, $turno, $id_squadra1, $id_squadra2, $data_match, $stato_match, $punteggio1, $punteggio2, $id_vincitore);
+        $stmt->execute();
+        $stmt->close();
+
+        $response["status"]  = "success";
+        $response["message"] = "Match creato con successo";
+        $response["data"]    = [
+            "id_torneo" => $id_torneo,
+            "id_match"  => $id_match,
+            "turno"     => $turno
+        ];
+        http_response_code(201);
+
+    } elseif ($method === "PUT") {
+        if (empty($input)) {
+            throw new Exception("Body JSON mancante", 400);
+        }
+
+        if (!isset($input["id_torneo"]) || !isset($input["id_match"]) || !isset($input["turno"])) {
+            throw new Exception("Chiavi primarie mancanti per aggiornare un match: id_torneo, id_match, turno", 400);
+        }
+
+        $id_torneo = (int) $input["id_torneo"];
+        $id_match  = (int) $input["id_match"];
+        $turno     = (int) $input["turno"];
+
+        $punteggio1    = isset($input["punteggio1"]) ? (int) $input["punteggio1"] : null;
+        $punteggio2    = isset($input["punteggio2"]) ? (int) $input["punteggio2"] : null;
+        $stato_match   = $input["stato_match"]   ?? null;
+        $id_vincitore  = isset($input["id_vincitore"]) ? (int) $input["id_vincitore"] : null;
+        $data_match    = $input["data_match"]    ?? null;
+        $id_squadra1   = isset($input["id_squadra1"]) ? (int) $input["id_squadra1"] : null;
+        $id_squadra2   = isset($input["id_squadra2"]) ? (int) $input["id_squadra2"] : null;
+
+        $stmt = $mysqli->prepare("
+            UPDATE match_torneo
+            SET punteggio1   = COALESCE(?, punteggio1),
+                punteggio2   = COALESCE(?, punteggio2),
+                stato_match  = COALESCE(?, stato_match),
+                id_vincitore = COALESCE(?, id_vincitore),
+                data_match   = COALESCE(?, data_match),
+                id_squadra1  = COALESCE(?, id_squadra1),
+                id_squadra2  = COALESCE(?, id_squadra2)
+            WHERE id_torneo = ? AND id_match = ? AND turno = ?
+        ");
+        $stmt->bind_param("iissiiiiii", $punteggio1, $punteggio2, $stato_match, $id_vincitore, $data_match, $id_squadra1, $id_squadra2, $id_torneo, $id_match, $turno);
+        $stmt->execute();
+        $stmt->close();
+
+        $response["status"]  = "success";
+        $response["message"] = "Match aggiornato con successo";
+        http_response_code(200);
+
+    } elseif ($method === "DELETE") {
+        if (!isset($queryParams["id_torneo"]) || !isset($queryParams["id_match"]) || !isset($queryParams["turno"])) {
+            throw new Exception("Parametri 'id_torneo', 'id_match' e 'turno' obbligatori per la cancellazione", 400);
+        }
+
+        $id_torneo = (int) $queryParams["id_torneo"];
+        $id_match  = (int) $queryParams["id_match"];
+        $turno     = (int) $queryParams["turno"];
+
+        $stmt = $mysqli->prepare("DELETE FROM match_torneo WHERE id_torneo = ? AND id_match = ? AND turno = ?");
+        $stmt->bind_param("iii", $id_torneo, $id_match, $turno);
+        $stmt->execute();
+        $stmt->close();
+
+        $response["status"]  = "success";
+        $response["message"] = "Match eliminato con successo";
+        http_response_code(200);
+
+    } else {
+        throw new Exception("Metodo HTTP non supportato: $method", 405);
+    }
+
+} catch (mysqli_sql_exception $e) {
+    http_response_code(500);
+    $response["status"]  = "error";
+    $response["message"] = "Errore Database: " . $e->getMessage();
+    error_log("DB error in api/match.php: " . $e->getMessage());
+
+} catch (Exception $e) {
+    $code = $e->getCode();
+    http_response_code($code >= 400 && $code < 600 ? $code : 500);
+    $response["status"]  = "error";
+    $response["message"] = $e->getMessage();
+} finally {
+    if (isset($mysqli) && $mysqli instanceof mysqli) {
+        $mysqli->close();
+    }
+}
+
+echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
