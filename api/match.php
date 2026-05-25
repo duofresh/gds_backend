@@ -192,7 +192,12 @@ try {
         $stmt = $mysqli->prepare("DELETE FROM match_torneo WHERE id_torneo = ? AND id_match = ? AND turno = ?");
         $stmt->bind_param("iii", $id_torneo, $id_match, $turno);
         $stmt->execute();
+        $affectedRows = $stmt->affected_rows;
         $stmt->close();
+
+        if ($affectedRows === 0) {
+            throw new Exception("Match non trovato", 404);
+        }
 
         $response["status"]  = "success";
         $response["message"] = "Match eliminato con successo";
