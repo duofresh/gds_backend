@@ -40,8 +40,24 @@ try {
 
             if (isset($queryParams["id_match"]) && isset($queryParams["turno"])) {
                 // Singolo match
-                $id_match = (int) $queryParams["id_match"];
-                $turno = (int) $queryParams["turno"];
+                $id_match = filter_var(
+                    $queryParams["id_match"],
+                    FILTER_VALIDATE_INT,
+                    ["options" => ["min_range" => 1]]
+                );
+                $turno = filter_var(
+                    $queryParams["turno"],
+                    FILTER_VALIDATE_INT,
+                    ["options" => ["min_range" => 1]]
+                );
+
+                if ($id_match === false) {
+                    throw new Exception("id_match non valido", 400);
+                }
+
+                if ($turno === false) {
+                    throw new Exception("turno non valido", 400);
+                }
 
                 $stmt = $mysqli->prepare("
                     SELECT m.*, s1.nome AS nome_squadra1, s2.nome AS nome_squadra2, sv.nome AS nome_vincitore
