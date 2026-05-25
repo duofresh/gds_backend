@@ -210,7 +210,8 @@ try {
 } catch (mysqli_sql_exception $e) {
     http_response_code(500);
     $response["status"]  = "error";
-    $response["message"] = "Errore Database: " . $e->getMessage();
+    $response["message"] = "Errore di connessione o esecuzione query sul Database";
+    $response["data"]    = null;
     error_log("DB error in api/match.php: " . $e->getMessage());
 
 } catch (Exception $e) {
