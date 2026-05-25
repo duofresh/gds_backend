@@ -28,40 +28,69 @@ $response = [
     "data"    => null,
 ];
 
+// Abilita le eccezioni per MySQLi (fondamentale per usare il try/catch)
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
 try {
-    // 3. Validazione metodo
-    if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-        throw new Exception("Metodo non consentito. Usa GET.", 405);
+    // // 3. Validazione metodo
+    // if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    //     throw new Exception("Metodo non consentito. Usa GET.", 405);
+    // }
+
+    // // 4. Validazione parametri GET
+    // if (!isset($_GET["id_sport"]) || $_GET["id_sport"] === "") {
+    //     throw new Exception("Parametro obbligatorio mancante: id_sport", 400);
+    // }
+
+    // $id_sport = intval($_GET["id_sport"]);
+
+    // if ($id_sport <= 0) {
+    //     throw new Exception("id_sport deve essere un intero positivo.", 400);
+    // }
+
+    $method = $_SERVER["REQUEST_METHOD"];
+
+    if ($method !== 'GET' && $method === 'POST'){
+        throw new Exception("Method not allowed. Use GET or POST.", 405);
     }
 
-    // 4. Validazione parametri GET
-    if (!isset($_GET["id_sport"]) || $_GET["id_sport"] === "") {
-        throw new Exception("Parametro obbligatorio mancante: id_sport", 400);
+    // 4. Connessione al DB (Utilizzo MySQLi)
+    $mysqli = require_once __DIR__ . '/../utils/conn.php';
+
+    if($method === 'GET'){
+        if(isset($_GET['id_squadra'])){
+            $id = intval($_GET['id_squadra']);
+            if ($id <= 0) {
+                throw new Exception("L'id fornito non è in un formato valido", 400);
+            }
+            $query = "SELECT * FROM squadre WHERE id_squadra = ? LIMIT 1";
+            $stmt = $mysqli->prepare($query);
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+
+            $result_set = $stmt->get_result();
+            $result = $result_set->fetch_all(MYSQLI_ASSOC);
+            $stmt->close>();
+        }else{
+            $query = "SELECT * FROM squadre";
+            $result_set = $mysqli->query($query);
+            $result = $result_set->fetch_all(MYSQLI_ASSOC);
+        }
+
+        
     }
-
-    $id_sport = intval($_GET["id_sport"]);
-
-    if ($id_sport <= 0) {
-        throw new Exception("id_sport deve essere un intero positivo.", 400);
-    }
-
-    // 5. Connessione al database
-    $host   = "localhost";
-    $dbname = "gds";
-    $user   = "root";
-    $pass   = "";
-
-    $pdo = new PDO(
-        "mysql:host=$host;dbname=$dbname;charset=utf8",
-        $user,
-        $pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
 
     // 6. Verifica che lo sport esista
-    $stmtSport = $pdo->prepare("SELECT id_sport, nome FROM sport WHERE id_sport = :id_sport");
-    $stmtSport->execute([":id_sport" => $id_sport]);
-    $sport = $stmtSport->fetch(PDO::FETCH_ASSOC);
+    $query = "SELECT id_sport, nome FROM sport WHERE id_sport = ?";
+    //$stmtSport = $pdo->prepare("SELECT id_sport, nome FROM sport WHERE id_sport = :id_sport");
+    $stmt = $mysqli->prepare($query);
+    //$stmtSport->execute([":id_sport" => $id_sport]);
+    $stmt->bind_param("i", $id_sport);
+    //$sport = $stmtSport->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute();
+    $result_set = $stmt->get_result();
+    $sport = $result_set -> fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
 
     if (!$sport) {
         throw new Exception("Nessuno sport trovato con id_sport = $id_sport", 404);
