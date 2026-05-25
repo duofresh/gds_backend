@@ -1,6 +1,6 @@
 <?php
 	$db_host = '127.0.0.1';
-	$db_name = 'giornatadellosport5';
+	$db_name = 'gds';
 	$db_user = 'root';
 	$db_pass = '';
 
