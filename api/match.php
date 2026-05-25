@@ -167,8 +167,29 @@ try {
 
         $data_match  = $input["data_match"] ?? null;
         $stato_match = $input["stato_match"] ?? 'PROGRAMMATO';
-        $punteggio1  = isset($input["punteggio1"]) ? (int) $input["punteggio1"] : 0;
-        $punteggio2  = isset($input["punteggio2"]) ? (int) $input["punteggio2"] : 0;
+        $punteggio1  = 0;
+        if (array_key_exists("punteggio1", $input) && $input["punteggio1"] !== null) {
+            $punteggio1 = filter_var(
+                $input["punteggio1"],
+                FILTER_VALIDATE_INT,
+                ["options" => ["min_range" => 0]]
+            );
+            if ($punteggio1 === false) {
+                throw new Exception("punteggio1 deve essere un intero maggiore o uguale a 0", 400);
+            }
+        }
+
+        $punteggio2  = 0;
+        if (array_key_exists("punteggio2", $input) && $input["punteggio2"] !== null) {
+            $punteggio2 = filter_var(
+                $input["punteggio2"],
+                FILTER_VALIDATE_INT,
+                ["options" => ["min_range" => 0]]
+            );
+            if ($punteggio2 === false) {
+                throw new Exception("punteggio2 deve essere un intero maggiore o uguale a 0", 400);
+            }
+        }
 
         $id_vincitore = null;
         if (array_key_exists("id_vincitore", $input) && $input["id_vincitore"] !== null) {
@@ -226,13 +247,31 @@ try {
         }
         $check->close();
 
+        $validateOptionalPositiveInt = function ($fieldName) use ($input) {
+            if (!array_key_exists($fieldName, $input)) {
+                return null;
+            }
+
+            $value = filter_var(
+                $input[$fieldName],
+                FILTER_VALIDATE_INT,
+                ["options" => ["min_range" => 1]]
+            );
+
+            if ($value === false) {
+                throw new Exception("Campo non valido: " . $fieldName, 400);
+            }
+
+            return $value;
+        };
+
         $punteggio1    = isset($input["punteggio1"]) ? (int) $input["punteggio1"] : null;
         $punteggio2    = isset($input["punteggio2"]) ? (int) $input["punteggio2"] : null;
         $stato_match   = $input["stato_match"]   ?? null;
-        $id_vincitore  = isset($input["id_vincitore"]) ? (int) $input["id_vincitore"] : null;
+        $id_vincitore  = $validateOptionalPositiveInt("id_vincitore");
         $data_match    = $input["data_match"]    ?? null;
-        $id_squadra1   = isset($input["id_squadra1"]) ? (int) $input["id_squadra1"] : null;
-        $id_squadra2   = isset($input["id_squadra2"]) ? (int) $input["id_squadra2"] : null;
+        $id_squadra1   = $validateOptionalPositiveInt("id_squadra1");
+        $id_squadra2   = $validateOptionalPositiveInt("id_squadra2");
 
         $stmt = $mysqli->prepare("
             UPDATE match_torneo
