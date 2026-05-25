@@ -188,7 +188,7 @@ try {
                 id_squadra2  = COALESCE(?, id_squadra2)
             WHERE id_torneo = ? AND id_match = ? AND turno = ?
         ");
-        $stmt->bind_param("iissiiiiii", $punteggio1, $punteggio2, $stato_match, $id_vincitore, $data_match, $id_squadra1, $id_squadra2, $id_torneo, $id_match, $turno);
+        $stmt->bind_param("iisisiiiii", $punteggio1, $punteggio2, $stato_match, $id_vincitore, $data_match, $id_squadra1, $id_squadra2, $id_torneo, $id_match, $turno);
         $stmt->execute();
         $stmt->close();
 
@@ -201,9 +201,25 @@ try {
             throw new Exception("Parametri 'id_torneo', 'id_match' e 'turno' obbligatori per la cancellazione", 400);
         }
 
-        $id_torneo = (int) $queryParams["id_torneo"];
-        $id_match  = (int) $queryParams["id_match"];
-        $turno     = (int) $queryParams["turno"];
+        $id_torneo = filter_var(
+            $queryParams["id_torneo"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+        $id_match = filter_var(
+            $queryParams["id_match"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+        $turno = filter_var(
+            $queryParams["turno"],
+            FILTER_VALIDATE_INT,
+            ["options" => ["min_range" => 1]]
+        );
+
+        if ($id_torneo === false || $id_match === false || $turno === false) {
+            throw new Exception("I parametri 'id_torneo', 'id_match' e 'turno' devono essere interi maggiori di 0", 400);
+        }
 
         $stmt = $mysqli->prepare("DELETE FROM match_torneo WHERE id_torneo = ? AND id_match = ? AND turno = ?");
         $stmt->bind_param("iii", $id_torneo, $id_match, $turno);
@@ -235,6 +251,7 @@ try {
     http_response_code($code >= 400 && $code < 600 ? $code : 500);
     $response["status"]  = "error";
     $response["message"] = $e->getMessage();
+    $response["data"]    = null;
 } finally {
     if (isset($mysqli) && $mysqli instanceof mysqli) {
         $mysqli->close();
