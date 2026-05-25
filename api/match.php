@@ -27,8 +27,16 @@ try {
     $mysqli = require_once __DIR__ . '/../utils/conn.php';
 
     if ($method === "GET") {
-        if (!empty($queryParams["id_torneo"])) {
-            $id_torneo = (int) $queryParams["id_torneo"];
+        if (isset($queryParams["id_torneo"])) {
+            $id_torneo = filter_var(
+                $queryParams["id_torneo"],
+                FILTER_VALIDATE_INT,
+                ["options" => ["min_range" => 1]]
+            );
+
+            if ($id_torneo === false) {
+                throw new Exception("id_torneo non valido", 400);
+            }
 
             if (isset($queryParams["id_match"]) && isset($queryParams["turno"])) {
                 // Singolo match
