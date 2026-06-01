@@ -121,9 +121,11 @@ try {
             $checkSquadra->close();
         }
 
-        $query = "INSERT INTO tornei (nome, anno, id_sport, id_vincitore) VALUES (?, ?, ?, ?)";
+        $stato = isset($inputData['stato']) ? trim($inputData['stato']) : 'in corso';
+
+        $query = "INSERT INTO tornei (nome, anno, id_sport, id_vincitore, stato) VALUES (?, ?, ?, ?, ?)";
         $stmt = $mysqli->prepare($query);
-        $stmt->bind_param("siii", $nome, $anno, $id_sport, $id_vincitore);
+        $stmt->bind_param("siiis", $nome, $anno, $id_sport, $id_vincitore, $stato);
         
         if ($stmt->execute()) {
             $newId = $stmt->insert_id;
@@ -132,7 +134,8 @@ try {
                 "nome" => $nome,
                 "anno" => $anno,
                 "id_sport" => $id_sport,
-                "id_vincitore" => $id_vincitore
+                "id_vincitore" => $id_vincitore,
+                "stato" => $stato
             ];
             
             // Costruzione risposta per POST
@@ -199,6 +202,7 @@ try {
         $anno         = isset($inputData["anno"]) ? (int) $inputData["anno"] : null;
         $id_sport     = isset($inputData["id_sport"]) ? (int) $inputData["id_sport"] : null;
         $id_vincitore = isset($inputData["id_vincitore"]) ? ($inputData["id_vincitore"] !== null ? (int)$inputData["id_vincitore"] : null) : null;
+        $stato        = isset($inputData["stato"]) ? trim($inputData["stato"]) : null;
 
         // We can do standard update
         $stmt = $mysqli->prepare("
@@ -206,14 +210,15 @@ try {
             SET nome         = COALESCE(?, nome),
                 anno         = COALESCE(?, anno),
                 id_sport     = COALESCE(?, id_sport),
+                stato        = COALESCE(?, stato),
                 id_vincitore = " . (array_key_exists("id_vincitore", $inputData) ? "?" : "id_vincitore") . "
             WHERE id_torneo = ?
         ");
 
         if (array_key_exists("id_vincitore", $inputData)) {
-            $stmt->bind_param("siiii", $nome, $anno, $id_sport, $id_vincitore, $id_torneo);
+            $stmt->bind_param("siiisi", $nome, $anno, $id_sport, $stato, $id_vincitore, $id_torneo);
         } else {
-            $stmt->bind_param("siii", $nome, $anno, $id_sport, $id_torneo);
+            $stmt->bind_param("siisi", $nome, $anno, $id_sport, $stato, $id_torneo);
         }
 
         $stmt->execute();

@@ -31,18 +31,7 @@ try {
     $input       = json_decode(file_get_contents("php://input"), true);
     $queryParams = $_GET;
 
-    // 4. Controllo autenticazione per i metodi di scrittura
-    if (in_array($method, ["POST", "PUT", "DELETE"])) {
-        $authHeader = $_SERVER["HTTP_AUTHORIZATION"] ?? "";
-        $apiToken   = getenv("API_WRITE_TOKEN") ?: "";
-        if (
-            empty($apiToken) ||
-            !preg_match('/^Bearer\s+(.+)$/', $authHeader, $matches) ||
-            !hash_equals($apiToken, $matches[1])
-        ) {
-            throw new Exception("Accesso non autorizzato", 401);
-        }
-    }
+
 
     // 5. Connessione al database
     $mysqli = require_once __DIR__ . '/../utils/conn.php';
