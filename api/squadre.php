@@ -46,36 +46,42 @@ try {
     }
 
     // 5. Connessione al database
-    $host   = "localhost";
-    $dbname = "giornatadellosport";
-    $user   = "root";
-    $pass   = "";
-
-    $pdo = new PDO(
-        "mysql:host=$host;dbname=$dbname;charset=utf8",
-        $user,
-        $pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
+    $mysqli = require_once __DIR__ . '/../utils/conn.php';
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
     // 6. Verifica che lo sport esista
-    $stmtSport = $pdo->prepare("SELECT id_sport, nome FROM sport WHERE id_sport = :id_sport");
-    $stmtSport->execute([":id_sport" => $id_sport]);
-    $sport = $stmtSport->fetch(PDO::FETCH_ASSOC);
+    $stmtSport = $mysqli->prepare("SELECT id_sport, nome FROM sport WHERE id_sport = ?");
+    $stmtSport->bind_param("i", $id_sport);
+    $stmtSport->execute();
+    $sport = $stmtSport->get_result()->fetch_assoc();
+    $stmtSport->close();
 
     if (!$sport) {
         throw new Exception("Nessuno sport trovato con id_sport = $id_sport", 404);
     }
 
     // 7. Query squadre per lo sport richiesto
-    $stmt = $pdo->prepare(
+    $stmt = $mysqli->prepare(
         "SELECT s.id_squadra, s.nome, s.coefficiente_team, s.id_sport
          FROM squadre s
-         WHERE s.id_sport = :id_sport
+         WHERE s.id_sport = ?
          ORDER BY s.nome ASC"
     );
-    $stmt->execute([":id_sport" => $id_sport]);
-    $squadre = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->bind_param("i", $id_sport);
+    $stmt->execute();
+    $squadre = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    // Convert integer and float fields
+    foreach ($squadre as &$row) {
+        $row["id_squadra"] = (int)$row["id_squadra"];
+        $row["id_sport"] = (int)$row["id_sport"];
+        $row["coefficiente_team"] = (float)$row["coefficiente_team"];
+    }
+
+    if ($sport) {
+        $sport["id_sport"] = (int)$sport["id_sport"];
+    }
 
     // 8. Costruzione risposta
     $response["status"]  = "success";
@@ -87,7 +93,7 @@ try {
     ];
     http_response_code(200);
 
-} catch (PDOException $e) {
+} catch (mysqli_sql_exception $e) {
     http_response_code(500);
     $response["status"]  = "error";
     $response["message"] = "Errore database: " . $e->getMessage();
@@ -96,6 +102,10 @@ try {
     http_response_code($code >= 400 && $code < 600 ? $code : 500);
     $response["status"]  = "error";
     $response["message"] = $e->getMessage();
+} finally {
+    if (isset($mysqli) && $mysqli instanceof mysqli) {
+        $mysqli->close();
+    }
 }
 
 // 9. Output JSON
