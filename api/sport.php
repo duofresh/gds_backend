@@ -86,22 +86,25 @@ try {
         }
 
         $nome = trim($inputData['nome']);
-        $descrizione = isset($inputData['descrizione']) ? trim($inputData['descrizione']) : null;
+        $numero_giocatori = isset($inputData['numero_giocatori']) ? (int) $inputData['numero_giocatori'] : 1;
 
         if (empty($nome)) {
              throw new Exception("Il campo 'nome' non può essere vuoto", 400);
         }
+        if ($numero_giocatori <= 0) {
+            throw new Exception("Il campo 'numero_giocatori' deve essere un numero positivo maggiore di zero", 400);
+        }
 
-        $query = "INSERT INTO sport (nome, descrizione) VALUES (?, ?)";
+        $query = "INSERT INTO sport (nome, numero_giocatori) VALUES (?, ?)";
         $stmt = $mysqli->prepare($query);
-        $stmt->bind_param("ss", $nome, $descrizione);
+        $stmt->bind_param("si", $nome, $numero_giocatori);
         
         if ($stmt->execute()) {
             $newId = $stmt->insert_id;
             $result = [
                 "id_sport" => $newId,
                 "nome" => $nome,
-                "descrizione" => $descrizione
+                "numero_giocatori" => $numero_giocatori
             ];
             
             // Costruzione risposta per POST

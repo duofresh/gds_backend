@@ -6,7 +6,7 @@
 header('Content-Type: text/plain; charset=utf-8');
 
 $host = '127.0.0.1'; // Può essere 'localhost' a seconda della configurazione XAMPP
-$dbname = 'gds_backend'; // Cambia questo col nome reale del tuo database
+$dbname = 'giornatadellosport'; // Cambia questo col nome reale del tuo database
 $user = 'root'; // Utente di default XAMPP
 $password = ''; // Password di default XAMPP (solitamente vuota)
 

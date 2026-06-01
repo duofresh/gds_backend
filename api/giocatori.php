@@ -49,7 +49,7 @@ try {
         if (!empty($queryParams["id_giocatore"])) {
             $id = (int) $queryParams["id_giocatore"];
             $stmt = $mysqli->prepare("
-                SELECT g.id_giocatore, g.nome, g.cognome, g.eta, g.agonista,
+                SELECT g.id_giocatore, g.nome, g.cognome, g.data_nascita, g.eta, g.agonista,
                        s.id_squadra, s.nome AS nome_squadra
                 FROM giocatori g
                 LEFT JOIN squadre s ON g.id_squadra = s.id_squadra
@@ -82,7 +82,7 @@ try {
             $check->close();
 
             $stmt = $mysqli->prepare("
-                SELECT g.id_giocatore, g.nome, g.cognome, g.eta, g.agonista,
+                SELECT g.id_giocatore, g.nome, g.cognome, g.data_nascita, g.eta, g.agonista,
                        s.id_squadra, s.nome AS nome_squadra
                 FROM giocatori g
                 LEFT JOIN squadre s ON g.id_squadra = s.id_squadra
@@ -101,7 +101,7 @@ try {
         } elseif (isset($queryParams["agonista"])) {
             $agonista = (int) $queryParams["agonista"];
             $stmt = $mysqli->prepare("
-                SELECT g.id_giocatore, g.nome, g.cognome, g.eta, g.agonista,
+                SELECT g.id_giocatore, g.nome, g.cognome, g.data_nascita, g.eta, g.agonista,
                        s.id_squadra, s.nome AS nome_squadra
                 FROM giocatori g
                 LEFT JOIN squadre s ON g.id_squadra = s.id_squadra
@@ -118,8 +118,8 @@ try {
             $response["data"]    = $giocatori;
 
         } else {
-            $result    = $mysqli->query("
-                SELECT g.id_giocatore, g.nome, g.cognome, g.eta, g.agonista,
+            $result = $mysqli->query("
+                SELECT g.id_giocatore, g.nome, g.cognome, g.data_nascita, g.eta, g.agonista,
                        s.id_squadra, s.nome AS nome_squadra
                 FROM giocatori g
                 LEFT JOIN squadre s ON g.id_squadra = s.id_squadra
@@ -137,7 +137,7 @@ try {
     } elseif ($method === "POST") {
         // POST
         // Body JSON richiesto:
-        //   { "nome": "Mario", "cognome": "Rossi", "eta": 25,
+        //   { "nome": "Mario", "cognome": "Rossi", "data_nascita": "2000-01-15",
         //     "agonista": 1, "id_squadra": 3 }
 
         if (empty($input)) {
@@ -151,9 +151,14 @@ try {
         if (empty($input["cognome"])) {
             throw new Exception("Il campo 'cognome' è obbligatorio", 400);
         }
+        if (empty($input["data_nascita"])) {
+            throw new Exception("Il campo 'data_nascita' è obbligatorio", 400);
+        }
 
-        if (isset($input["eta"]) && (!is_numeric($input["eta"]) || $input["eta"] < 0)) {
-            throw new Exception("Il campo 'eta' deve essere un numero positivo", 400);
+        // Validazione formato data_nascita (YYYY-MM-DD)
+        $d = DateTime::createFromFormat('Y-m-d', $input["data_nascita"]);
+        if (!$d || $d->format('Y-m-d') !== $input["data_nascita"]) {
+            throw new Exception("Il campo 'data_nascita' deve essere una data valida nel formato YYYY-MM-DD", 400);
         }
 
         // Validazione agonista (deve essere 0 o 1)
@@ -174,32 +179,43 @@ try {
             $check->close();
         }
 
-        $nome       = $input["nome"];
-        $cognome    = $input["cognome"];
-        $eta        = isset($input["eta"])        ? (int) $input["eta"]        : null;
-        $agonista   = isset($input["agonista"])   ? (int) $input["agonista"]   : 0;
-        $id_squadra = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
+        $nome         = $input["nome"];
+        $cognome      = $input["cognome"];
+        $data_nascita = $input["data_nascita"];
+        $agonista     = isset($input["agonista"])   ? (int) $input["agonista"]   : 0;
+        $id_squadra   = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
 
         $stmt = $mysqli->prepare("
-            INSERT INTO giocatori (nome, cognome, eta, agonista, id_squadra)
+            INSERT INTO giocatori (nome, cognome, data_nascita, agonista, id_squadra)
             VALUES (?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("ssiii", $nome, $cognome, $eta, $agonista, $id_squadra);
+        $stmt->bind_param("sssii", $nome, $cognome, $data_nascita, $agonista, $id_squadra);
         $stmt->execute();
 
         $nuovoId = $mysqli->insert_id;
         $stmt->close();
 
+        // Recupera il giocatore appena creato con eta calcolata da DB trigger
+        $stmtSelect = $mysqli->prepare("
+            SELECT id_giocatore, nome, cognome, data_nascita, eta, agonista, id_squadra
+            FROM giocatori
+            WHERE id_giocatore = ?
+        ");
+        $stmtSelect->bind_param("i", $nuovoId);
+        $stmtSelect->execute();
+        $giocatoreNuovo = $stmtSelect->get_result()->fetch_assoc();
+        $stmtSelect->close();
+
+        if ($giocatoreNuovo) {
+            $giocatoreNuovo["id_giocatore"] = (int)$giocatoreNuovo["id_giocatore"];
+            $giocatoreNuovo["eta"] = (int)$giocatoreNuovo["eta"];
+            $giocatoreNuovo["agonista"] = (int)$giocatoreNuovo["agonista"];
+            $giocatoreNuovo["id_squadra"] = $giocatoreNuovo["id_squadra"] !== null ? (int)$giocatoreNuovo["id_squadra"] : null;
+        }
+
         $response["status"]  = "success";
         $response["message"] = "Giocatore creato con successo";
-        $response["data"]    = [
-            "id_giocatore" => (int) $nuovoId,
-            "nome"         => $nome,
-            "cognome"      => $cognome,
-            "eta"          => $eta,
-            "agonista"     => $agonista,
-            "id_squadra"   => $id_squadra,
-        ];
+        $response["data"]    = $giocatoreNuovo;
 
         http_response_code(201);
 
@@ -207,7 +223,7 @@ try {
         // PUT
         // Body JSON richiesto:
         //   { "id_giocatore": 5, "nome": "Cristiano", "cognome": "Messi",
-        //     "eta": 30, "agonista": 0, "id_squadra": 2 }
+        //     "data_nascita": "1995-06-25", "agonista": 0, "id_squadra": 2 }
 
         if (empty($input)) {
             throw new Exception("Body JSON mancante o non valido", 400);
@@ -229,8 +245,11 @@ try {
         $check->close();
 
         // Validazioni opzionali
-        if (isset($input["eta"]) && (!is_numeric($input["eta"]) || $input["eta"] < 0)) {
-            throw new Exception("Il campo 'eta' deve essere un numero positivo", 400);
+        if (isset($input["data_nascita"])) {
+            $d = DateTime::createFromFormat('Y-m-d', $input["data_nascita"]);
+            if (!$d || $d->format('Y-m-d') !== $input["data_nascita"]) {
+                throw new Exception("Il campo 'data_nascita' deve essere una data valida nel formato YYYY-MM-DD", 400);
+            }
         }
         if (isset($input["agonista"]) && !in_array($input["agonista"], [0, 1], true)) {
             throw new Exception("Il campo 'agonista' deve essere 0 (No) o 1 (Sì)", 400);
@@ -247,28 +266,46 @@ try {
             $check2->close();
         }
 
-        $nome       = $input["nome"]       ?? null;
-        $cognome    = $input["cognome"]    ?? null;
-        $eta        = isset($input["eta"])        ? (int) $input["eta"]        : null;
-        $agonista   = isset($input["agonista"])   ? (int) $input["agonista"]   : null;
-        $id_squadra = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
+        $nome         = $input["nome"]         ?? null;
+        $cognome      = $input["cognome"]      ?? null;
+        $data_nascita = $input["data_nascita"] ?? null;
+        $agonista     = isset($input["agonista"])   ? (int) $input["agonista"]   : null;
+        $id_squadra   = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
 
         $stmt = $mysqli->prepare("
             UPDATE giocatori
-            SET nome       = COALESCE(?, nome),
-                cognome    = COALESCE(?, cognome),
-                eta        = COALESCE(?, eta),
-                agonista   = COALESCE(?, agonista),
-                id_squadra = COALESCE(?, id_squadra)
+            SET nome         = COALESCE(?, nome),
+                cognome      = COALESCE(?, cognome),
+                data_nascita = COALESCE(?, data_nascita),
+                agonista     = COALESCE(?, agonista),
+                id_squadra   = COALESCE(?, id_squadra)
             WHERE id_giocatore = ?
         ");
-        $stmt->bind_param("ssiiii", $nome, $cognome, $eta, $agonista, $id_squadra, $id_giocatore);
+        $stmt->bind_param("sssiii", $nome, $cognome, $data_nascita, $agonista, $id_squadra, $id_giocatore);
         $stmt->execute();
         $stmt->close();
 
+        // Recupera il giocatore aggiornato per mostrare tutti i campi inclusa eta modificata da trigger
+        $stmtSelect = $mysqli->prepare("
+            SELECT id_giocatore, nome, cognome, data_nascita, eta, agonista, id_squadra
+            FROM giocatori
+            WHERE id_giocatore = ?
+        ");
+        $stmtSelect->bind_param("i", $id_giocatore);
+        $stmtSelect->execute();
+        $giocatoreAggiornato = $stmtSelect->get_result()->fetch_assoc();
+        $stmtSelect->close();
+
+        if ($giocatoreAggiornato) {
+            $giocatoreAggiornato["id_giocatore"] = (int)$giocatoreAggiornato["id_giocatore"];
+            $giocatoreAggiornato["eta"] = (int)$giocatoreAggiornato["eta"];
+            $giocatoreAggiornato["agonista"] = (int)$giocatoreAggiornato["agonista"];
+            $giocatoreAggiornato["id_squadra"] = $giocatoreAggiornato["id_squadra"] !== null ? (int)$giocatoreAggiornato["id_squadra"] : null;
+        }
+
         $response["status"]  = "success";
         $response["message"] = "Giocatore aggiornato con successo";
-        $response["data"]    = ["id_giocatore" => $id_giocatore];
+        $response["data"]    = $giocatoreAggiornato;
 
         http_response_code(200);
 

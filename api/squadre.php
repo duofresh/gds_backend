@@ -47,7 +47,7 @@ try {
 
     // 5. Connessione al database
     $host   = "localhost";
-    $dbname = "gds";
+    $dbname = "giornatadellosport";
     $user   = "root";
     $pass   = "";
 

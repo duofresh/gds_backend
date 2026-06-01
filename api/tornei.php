@@ -26,9 +26,9 @@ try {
     // 3. Validazione metodo richiesta
     $method = $_SERVER["REQUEST_METHOD"];
 
-    // Accettiamo richieste GET e POST
-    if ($method !== 'GET' && $method !== 'POST') {
-        throw new Exception("Method not allowed. Use GET or POST.", 405);
+    // Accettiamo richieste GET, POST, PUT e DELETE
+    if ($method !== 'GET' && $method !== 'POST' && $method !== 'PUT' && $method !== 'DELETE') {
+        throw new Exception("Method not allowed. Use GET, POST, PUT or DELETE.", 405);
     }
 
     // --- INIZIO LOGICA INTEGRATA CON REQUISITI ---
@@ -77,37 +77,53 @@ try {
         if (!$inputData || !isset($inputData['nome'])) {
             throw new Exception("Dati mancanti o formato JSON non valido. Richiesto campo 'nome'.", 400);
         }
-        if(!$inputData || !isset($inputData['anno'])){
+        if (!$inputData || !isset($inputData['anno'])){
             throw new Exception("Dati mancanti o formato JSON non valido. Richiesto campo 'anno'.", 400);
         } 
-        if(!$inputData || !isset($inputData['stato'])){
-            throw new Exception("Dati mancanti o formato JSON non valido. Richiesto campo 'stato'.", 400);
-        }
-        if(!$inputData || !isset($inputData['id_sport'])){
+        if (!$inputData || !isset($inputData['id_sport'])){
             throw new Exception("Dati mancanti o formato JSON non valido. Richiesto campo 'id_sport'.", 400);
         } 
 
         $nome = trim($inputData['nome']);
         $anno = (int) $inputData['anno'];
-        $stato =  trim($inputData['stato']);
         $id_sport = (int) $inputData['id_sport'];
+        $id_vincitore = isset($inputData['id_vincitore']) && $inputData['id_vincitore'] !== null ? (int)$inputData['id_vincitore'] : null;
 
         if (empty($nome)) {
             throw new Exception("Il campo 'nome' non può essere vuoto", 400);
         }
-        if (empty($anno)) {
-            throw new Exception("Il campo 'anno' non può essere vuoto", 400);
+        if ($anno <= 0) {
+            throw new Exception("Il campo 'anno' deve essere un anno valido maggiore di zero", 400);
         }
-        if (empty($stato)) {
-            throw new Exception("Il campo 'stato' non può essere vuoto", 400);
-        }
-        if (empty($id_sport)) {
-            throw new Exception("Il campo 'id_sport' non può essere vuoto", 400);
+        if ($id_sport <= 0) {
+            throw new Exception("Il campo 'id_sport' deve essere un ID valido maggiore di zero", 400);
         }
 
-        $query = "INSERT INTO tornei (nome, anno, stato, id_sport) VALUES (?, ?, ?, ?)";
+        // Verifica esistenza sport
+        $checkSport = $mysqli->prepare("SELECT id_sport FROM sport WHERE id_sport = ?");
+        $checkSport->bind_param("i", $id_sport);
+        $checkSport->execute();
+        if (!$checkSport->get_result()->fetch_assoc()) {
+            $checkSport->close();
+            throw new Exception("Lo sport con ID " . $id_sport . " non esiste", 400);
+        }
+        $checkSport->close();
+
+        // Verifica esistenza vincitore se fornito
+        if ($id_vincitore !== null) {
+            $checkSquadra = $mysqli->prepare("SELECT id_squadra FROM squadre WHERE id_squadra = ?");
+            $checkSquadra->bind_param("i", $id_vincitore);
+            $checkSquadra->execute();
+            if (!$checkSquadra->get_result()->fetch_assoc()) {
+                $checkSquadra->close();
+                throw new Exception("La squadra con ID " . $id_vincitore . " non esiste", 400);
+            }
+            $checkSquadra->close();
+        }
+
+        $query = "INSERT INTO tornei (nome, anno, id_sport, id_vincitore) VALUES (?, ?, ?, ?)";
         $stmt = $mysqli->prepare($query);
-        $stmt->bind_param("sisi", $nome, $anno, $stato, $id_sport);
+        $stmt->bind_param("siii", $nome, $anno, $id_sport, $id_vincitore);
         
         if ($stmt->execute()) {
             $newId = $stmt->insert_id;
@@ -115,8 +131,8 @@ try {
                 "id_torneo" => $newId,
                 "nome" => $nome,
                 "anno" => $anno,
-                "stato" => $stato,
-                "id_sport" => $id_sport
+                "id_sport" => $id_sport,
+                "id_vincitore" => $id_vincitore
             ];
             
             // Costruzione risposta per POST
@@ -129,7 +145,7 @@ try {
         }
         $stmt->close();
     }
-    elseif($method === 'PUT'){
+    elseif ($method === 'PUT') {
         $inputData = json_decode(file_get_contents("php://input"), true);
         if (empty($inputData)) {
             throw new Exception("Body JSON mancante o non valido", 400);
@@ -137,12 +153,8 @@ try {
         if (empty($inputData["id_torneo"])) {
             throw new Exception("Il campo 'id_torneo' è obbligatorio per l'aggiornamento", 400);
         }
-        if (!isset($inputData["stato"])) {
-            throw new Exception("Il campo 'stato' è obbligatorio", 400);
-        }
 
         $id_torneo = (int) $inputData["id_torneo"];
-        $stato = trim($inputData['stato']);
 
         // Verifica che il torneo esista
         $check = $mysqli->prepare("SELECT id_torneo FROM tornei WHERE id_torneo = ?");
@@ -154,21 +166,76 @@ try {
         }
         $check->close();
 
-        $stato = trim($inputData['stato']);
+        // Validations if provided
+        if (isset($inputData["anno"]) && (int)$inputData["anno"] <= 0) {
+            throw new Exception("Il campo 'anno' deve essere maggiore di zero", 400);
+        }
 
+        if (isset($inputData["id_sport"])) {
+            $id_sport_check = (int) $inputData["id_sport"];
+            $checkSport = $mysqli->prepare("SELECT id_sport FROM sport WHERE id_sport = ?");
+            $checkSport->bind_param("i", $id_sport_check);
+            $checkSport->execute();
+            if (!$checkSport->get_result()->fetch_assoc()) {
+                $checkSport->close();
+                throw new Exception("Lo sport con ID " . $id_sport_check . " non esiste", 400);
+            }
+            $checkSport->close();
+        }
+
+        if (isset($inputData["id_vincitore"]) && $inputData["id_vincitore"] !== null) {
+            $id_vincitore_check = (int) $inputData["id_vincitore"];
+            $checkSquadra = $mysqli->prepare("SELECT id_squadra FROM squadre WHERE id_squadra = ?");
+            $checkSquadra->bind_param("i", $id_vincitore_check);
+            $checkSquadra->execute();
+            if (!$checkSquadra->get_result()->fetch_assoc()) {
+                $checkSquadra->close();
+                throw new Exception("La squadra con ID " . $id_vincitore_check . " non esiste", 400);
+            }
+            $checkSquadra->close();
+        }
+
+        $nome         = isset($inputData["nome"]) ? trim($inputData["nome"]) : null;
+        $anno         = isset($inputData["anno"]) ? (int) $inputData["anno"] : null;
+        $id_sport     = isset($inputData["id_sport"]) ? (int) $inputData["id_sport"] : null;
+        $id_vincitore = isset($inputData["id_vincitore"]) ? ($inputData["id_vincitore"] !== null ? (int)$inputData["id_vincitore"] : null) : null;
+
+        // We can do standard update
         $stmt = $mysqli->prepare("
             UPDATE tornei
-            SET stato = ?
+            SET nome         = COALESCE(?, nome),
+                anno         = COALESCE(?, anno),
+                id_sport     = COALESCE(?, id_sport),
+                id_vincitore = " . (array_key_exists("id_vincitore", $inputData) ? "?" : "id_vincitore") . "
             WHERE id_torneo = ?
         ");
 
-        $stmt->bind_param("si", $stato, $id_torneo);
+        if (array_key_exists("id_vincitore", $inputData)) {
+            $stmt->bind_param("siiii", $nome, $anno, $id_sport, $id_vincitore, $id_torneo);
+        } else {
+            $stmt->bind_param("siii", $nome, $anno, $id_sport, $id_torneo);
+        }
+
         $stmt->execute();
         $stmt->close();
 
+        // Fetch updated data to return
+        $stmtSelect = $mysqli->prepare("SELECT * FROM tornei WHERE id_torneo = ?");
+        $stmtSelect->bind_param("i", $id_torneo);
+        $stmtSelect->execute();
+        $torneoAggiornato = $stmtSelect->get_result()->fetch_assoc();
+        $stmtSelect->close();
+
+        if ($torneoAggiornato) {
+            $torneoAggiornato["id_torneo"] = (int)$torneoAggiornato["id_torneo"];
+            $torneoAggiornato["anno"] = (int)$torneoAggiornato["anno"];
+            $torneoAggiornato["id_sport"] = (int)$torneoAggiornato["id_sport"];
+            $torneoAggiornato["id_vincitore"] = $torneoAggiornato["id_vincitore"] !== null ? (int)$torneoAggiornato["id_vincitore"] : null;
+        }
+
         $response["status"]  = "success";
         $response["message"] = "Torneo aggiornato con successo";
-        $response["data"]    = ["id_torneo" => $id_torneo];
+        $response["data"]    = $torneoAggiornato;
 
         http_response_code(200);
     }

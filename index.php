@@ -26,6 +26,13 @@ switch ($request) {
     case "/api/tornei":
         include "api/tornei.php";
         break;
+    case "/api/match":
+    case "/api/match_torneo":
+        include "api/match.php";
+        break;
+    case "/api/iscrizioni":
+        include "api/iscrizioni.php";
+        break;
     default:
         http_response_code(404);
         echo "404 - Not Found: " . htmlspecialchars($request);
