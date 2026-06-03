@@ -174,11 +174,23 @@ try {
         $agonista     = isset($input["agonista"])   ? (int) $input["agonista"]   : 0;
         $id_squadra   = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
 
+        // Calculate age (eta) in PHP to bypass database trigger dependency
+        $eta = 0;
+        if (!empty($data_nascita)) {
+            try {
+                $birthDate = new DateTime($data_nascita);
+                $today = new DateTime();
+                $eta = $today->diff($birthDate)->y;
+            } catch (Exception $e) {
+                $eta = 0;
+            }
+        }
+
         $stmt = $mysqli->prepare("
-            INSERT INTO giocatori (nome, cognome, data_nascita, agonista, id_squadra)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO giocatori (nome, cognome, data_nascita, agonista, id_squadra, eta)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("sssii", $nome, $cognome, $data_nascita, $agonista, $id_squadra);
+        $stmt->bind_param("sssiii", $nome, $cognome, $data_nascita, $agonista, $id_squadra, $eta);
         $stmt->execute();
 
         $nuovoId = $mysqli->insert_id;
@@ -261,16 +273,29 @@ try {
         $agonista     = isset($input["agonista"])   ? (int) $input["agonista"]   : null;
         $id_squadra   = isset($input["id_squadra"]) ? (int) $input["id_squadra"] : null;
 
+        // Calculate age if date of birth is updated
+        $eta = null;
+        if ($data_nascita !== null && !empty($data_nascita)) {
+            try {
+                $birthDate = new DateTime($data_nascita);
+                $today = new DateTime();
+                $eta = $today->diff($birthDate)->y;
+            } catch (Exception $e) {
+                $eta = null;
+            }
+        }
+
         $stmt = $mysqli->prepare("
             UPDATE giocatori
             SET nome         = COALESCE(?, nome),
                 cognome      = COALESCE(?, cognome),
                 data_nascita = COALESCE(?, data_nascita),
                 agonista     = COALESCE(?, agonista),
-                id_squadra   = COALESCE(?, id_squadra)
+                id_squadra   = COALESCE(?, id_squadra),
+                eta          = COALESCE(?, eta)
             WHERE id_giocatore = ?
         ");
-        $stmt->bind_param("sssiii", $nome, $cognome, $data_nascita, $agonista, $id_squadra, $id_giocatore);
+        $stmt->bind_param("sssiiii", $nome, $cognome, $data_nascita, $agonista, $id_squadra, $eta, $id_giocatore);
         $stmt->execute();
         $stmt->close();
 
